@@ -50,3 +50,17 @@ export function updateTask(
     body: payload,
   });
 }
+
+export function updateTaskAssignee(taskId: string, assigneeId: string | null): Promise<TaskDetail> {
+  return apiRequest<TaskDetail>(`/tasks/${taskId}/assignee`, {
+    method: 'PATCH',
+    body: { assigneeId },
+  });
+}
+
+import type { ActivityEntry, CursorPaginated } from '@projectflow/shared';
+
+export function fetchTaskActivities(taskId: string, cursor?: string): Promise<CursorPaginated<ActivityEntry>> {
+  const query = cursor ? { cursor, limit: 6 } : { limit: 6 };
+  return apiRequest<CursorPaginated<ActivityEntry>>(`/tasks/${taskId}/activity`, { query });
+}
