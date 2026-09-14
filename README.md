@@ -118,6 +118,17 @@ pnpm dev
 
 ---
 
+## API Documentation (Swagger)
+
+Interactive Swagger API documentation has been configured for the backend.
+
+1. Ensure the development server is running (`pnpm dev`).
+2. Navigate to: [http://localhost:4732/projectflow/api/docs](http://localhost:4732/projectflow/api/docs)
+
+You can use the **Authorize** button at the top of the Swagger UI to inject a valid JWT Bearer token (obtained by calling the `/auth/login` endpoint or intercepting your browser network traffic) to test secured endpoints directly from the browser.
+
+---
+
 ## Commands
 
 | Command          | Description                                |
