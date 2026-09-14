@@ -1,4 +1,4 @@
-import type { ProjectDetail, ProjectMemberEntry, ProjectSummary } from '@projectflow/shared';
+import type { CreateProjectPayload, ProjectDetail, ProjectMemberEntry, ProjectSummary } from '@projectflow/shared';
 import { apiRequest } from '@/lib/api-client';
 
 export function fetchProjects(): Promise<ProjectSummary[]> {
@@ -11,4 +11,11 @@ export function fetchProject(projectId: string): Promise<ProjectDetail> {
 
 export function fetchProjectMembers(projectId: string): Promise<ProjectMemberEntry[]> {
   return apiRequest<ProjectMemberEntry[]>(`/projects/${projectId}/members`);
+}
+
+export function createProject(payload: CreateProjectPayload): Promise<ProjectDetail> {
+  return apiRequest<ProjectDetail>('/projects', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
 }

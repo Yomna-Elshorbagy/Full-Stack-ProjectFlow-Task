@@ -111,3 +111,10 @@ export interface AddOrganizationMemberPayload {
   email: string;
   role: OrganizationRole;
 }
+
+export interface CreateProjectPayload {
+  organizationId: string;
+  name: string;
+  key: string;
+  description?: string;
+}

@@ -77,6 +77,11 @@ Crucially, instead of using arrays of ObjectIds on the parent document (which is
 - **Risk:** Without the ability to add members to an organization, the core collaborative aspect of the platform is broken. Users are isolated and cannot work together across projects.
 - **Action:** I will implement a new `POST /organizations/:id/members` endpoint on the backend to handle role assignments, and build an `AddMemberDialog` component in the frontend UI to allow elevated users to add new members.
 
+### 11. Missing Create Project UI (UX / Completeness)
+- **Observation:** The backend API has a fully functional `POST /projects` endpoint (and it successfully connects to `ProjectsService.create`), but the frontend is completely missing the UI to trigger this.
+- **Risk:** Without a UI to create projects, users cannot initiate new workstreams without manual database seeding, breaking a core loop of the application.
+- **Action:** I will build a `CreateProjectDialog` component for the frontend and integrate it into the `ProjectsView` page header, restricting it to users with an elevated organization role (`OWNER` or `ADMIN`).
+
 ## Structure & Layer Responsibility
 
 ```text
