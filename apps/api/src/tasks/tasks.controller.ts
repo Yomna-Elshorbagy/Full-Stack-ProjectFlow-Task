@@ -10,6 +10,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { Paginated, TaskDetail, TaskSummary } from '@projectflow/shared';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { toObjectId } from '../common/utils/object-id';
@@ -22,6 +23,8 @@ import { PaginationQueryDto } from '../common/dto/pagination.dto';
 import type { ActivityEntry } from '@projectflow/shared';
 import { TasksService } from './tasks.service';
 
+@ApiTags('Tasks')
+@ApiBearerAuth()
 @Controller()
 export class TasksController {
   constructor(private readonly tasksService: TasksService) {}

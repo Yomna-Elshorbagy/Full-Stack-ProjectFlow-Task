@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { CommentEntry, Paginated } from '@projectflow/shared';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { PaginationQueryDto } from '../common/dto/pagination.dto';
@@ -6,6 +7,8 @@ import { toObjectId } from '../common/utils/object-id';
 import { CommentsService } from './comments.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
 
+@ApiTags('Comments')
+@ApiBearerAuth()
 @Controller('tasks/:taskId/comments')
 export class CommentsController {
   constructor(private readonly commentsService: CommentsService) {}
