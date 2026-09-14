@@ -6,9 +6,11 @@ import { FolderIcon } from '@phosphor-icons/react/dist/ssr';
 import type { CurrentUser, ProjectSummary } from '@projectflow/shared';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { isElevatedOrganizationRole } from '@projectflow/shared';
 import { Logo } from './logo';
 import { SidebarProjectItem } from './sidebar-project-item';
 import { UserMenu } from './user-menu';
+import { AddMemberDialog } from '@/features/organizations/components/add-member-dialog';
 
 interface SidebarProps {
   user: CurrentUser;
@@ -26,9 +28,14 @@ export function Sidebar({ user, projects, isLoadingProjects, onNavigate }: Sideb
       <div className="px-2 pt-1">
         <Logo />
         {organization ? (
-          <p className="mt-2 text-[11px] font-medium uppercase tracking-wide text-subtle-foreground">
-            {organization.name}
-          </p>
+          <div className="mt-2 flex items-center justify-between">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-subtle-foreground">
+              {organization.name}
+            </p>
+            {isElevatedOrganizationRole(organization.role) && (
+              <AddMemberDialog organizationId={organization.id} />
+            )}
+          </div>
         ) : null}
       </div>
 

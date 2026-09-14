@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import type { CommentEntry, Paginated } from '@projectflow/shared';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { PaginationQueryDto } from '../common/dto/pagination.dto';
@@ -14,6 +14,8 @@ export class CommentsController {
   constructor(private readonly commentsService: CommentsService) {}
 
   @Get()
+  @ApiOperation({ summary: 'Get comments for a task' })
+  @ApiResponse({ status: 200, description: 'List of comments.' })
   findByTask(
     @Param('taskId') taskId: string,
     @CurrentUser('id') userId: string,
@@ -27,6 +29,8 @@ export class CommentsController {
   }
 
   @Post()
+  @ApiOperation({ summary: 'Create a comment on a task' })
+  @ApiResponse({ status: 201, description: 'Comment created successfully.' })
   create(
     @Param('taskId') taskId: string,
     @CurrentUser('id') userId: string,

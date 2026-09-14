@@ -106,3 +106,8 @@ export interface ApiErrorBody {
   message: string;
   error: string;
 }
+
+export interface AddOrganizationMemberPayload {
+  email: string;
+  role: OrganizationRole;
+}

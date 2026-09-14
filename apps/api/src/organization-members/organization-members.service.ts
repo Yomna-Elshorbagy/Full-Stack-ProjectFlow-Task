@@ -38,4 +38,17 @@ export class OrganizationMembersService {
       .exec();
     return memberships.map((membership) => membership.organizationId);
   }
+
+  async addMember(
+    organizationId: Types.ObjectId,
+    userId: Types.ObjectId,
+    role: OrganizationRole,
+  ): Promise<OrganizationMemberDocument> {
+    const membership = new this.organizationMemberModel({
+      organizationId,
+      userId,
+      role,
+    });
+    return membership.save();
+  }
 }
