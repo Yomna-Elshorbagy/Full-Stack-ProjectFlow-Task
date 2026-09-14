@@ -1,34 +1,34 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Logo } from '@/components/layout/logo';
-import { LoginForm } from '@/features/auth/components/login-form';
+import { RegisterForm } from '@/features/auth/components/register-form';
 
 export const metadata: Metadata = {
-  title: 'Sign in',
+  title: 'Sign up',
 };
 
-export default function LoginPage() {
+export default function RegisterPage() {
   return (
     <div className="flex min-h-dvh items-center justify-center px-4 py-12">
       <div className="w-full max-w-sm space-y-6">
         <div className="space-y-2">
           <Logo />
           <h1 className="text-xl font-semibold tracking-tight text-foreground">
-            Sign in to your workspace
+            Create an account
           </h1>
           <p className="text-[13px] text-muted-foreground">
-            Use the account your workspace administrator created for you.
+            Get started with your new workspace.
           </p>
         </div>
 
         <div className="rounded-lg border border-border bg-surface p-5">
-          <LoginForm />
+          <RegisterForm />
         </div>
 
         <p className="text-center text-[13px] text-muted-foreground">
-          Don&apos;t have an account?{' '}
-          <Link href="/register" className="font-medium text-foreground hover:underline">
-            Sign up
+          Already have an account?{' '}
+          <Link href="/login" className="font-medium text-foreground hover:underline">
+            Sign in
           </Link>
         </p>
       </div>

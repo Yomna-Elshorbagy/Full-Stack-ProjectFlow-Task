@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import type { AuthSession, CurrentUser } from '@projectflow/shared';
 import { clearAccessToken, setAccessToken } from '@/lib/auth-storage';
 import { queryKeys } from '@/lib/query-keys';
-import { fetchCurrentUser, login, type LoginPayload } from './api';
+import { fetchCurrentUser, login, type LoginPayload, register, type RegisterPayload } from './api';
 
 export function useCurrentUser() {
   return useQuery<CurrentUser>({
@@ -21,6 +21,20 @@ export function useLogin() {
 
   return useMutation<AuthSession, Error, LoginPayload>({
     mutationFn: login,
+    onSuccess: async (session) => {
+      setAccessToken(session.accessToken);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.currentUser });
+      router.replace('/projects');
+    },
+  });
+}
+
+export function useRegister() {
+  const queryClient = useQueryClient();
+  const router = useRouter();
+
+  return useMutation<AuthSession, Error, RegisterPayload>({
+    mutationFn: register,
     onSuccess: async (session) => {
       setAccessToken(session.accessToken);
       await queryClient.invalidateQueries({ queryKey: queryKeys.currentUser });

@@ -6,6 +6,20 @@ export interface LoginPayload {
   password: string;
 }
 
+export interface RegisterPayload {
+  name: string;
+  email: string;
+  password: string;
+}
+
+export function register(payload: RegisterPayload): Promise<AuthSession> {
+  return apiRequest<AuthSession>('/auth/register', {
+    method: 'POST',
+    body: payload,
+    anonymous: true,
+  });
+}
+
 export function login(payload: LoginPayload): Promise<AuthSession> {
   return apiRequest<AuthSession>('/auth/login', {
     method: 'POST',
