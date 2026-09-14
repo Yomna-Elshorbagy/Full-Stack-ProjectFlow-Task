@@ -72,6 +72,11 @@ Crucially, instead of using arrays of ObjectIds on the parent document (which is
 - **Risk:** While this is perfectly fine for 5,000 users, as the application scales towards 500,000 users, the database will bottleneck on heavily accessed endpoints, causing slow response times and high infrastructure costs.
 - **Action:** A standard scaling improvement would be to introduce an in-memory cache like **Redis**. The best practice is to only cache data with a high read-to-write ratio (e.g., the first page of the Activity History or the Project Details). Crucially, an event-driven invalidation strategy must be implemented to delete the cache key whenever the underlying data is mutated (e.g., when a task is updated).
 
+### 10. Missing Organization Member Management (UX / Completeness)
+- **Observation:** The platform currently supports organizations, but there is no mechanism for an admin or owner to invite or add a new user to their organization. Both the API endpoint and the frontend UI for this are completely missing.
+- **Risk:** Without the ability to add members to an organization, the core collaborative aspect of the platform is broken. Users are isolated and cannot work together across projects.
+- **Action:** I will implement a new `POST /organizations/:id/members` endpoint on the backend to handle role assignments, and build an `AddMemberDialog` component in the frontend UI to allow elevated users to add new members.
+
 ## Structure & Layer Responsibility
 
 ```text

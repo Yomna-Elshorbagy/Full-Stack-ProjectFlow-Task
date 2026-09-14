@@ -1,4 +1,4 @@
-# 1- Bug Report: Unauthorized Task Modification (IDOR)
+# 1- Bug Report: Unauthorized Task Modification (IDOR) ==> (Fixed)
 
 ## Description
 A security vulnerability (Insecure Direct Object Reference) was found in the `PATCH /tasks/:taskId/status` endpoint. Any authenticated user could change the status of any task across the entire platform just by supplying a valid `taskId`, bypassing project access controls entirely.
@@ -13,7 +13,7 @@ The `tasksService.updateStatus()` method only fetched the task and saved the new
 
 ---
 
-# 2- Bug Report: Concurrent Task Creation Race Condition
+# 2- Bug Report: Concurrent Task Creation Race Condition ==> (Fixed)
 
 ## Description
 Under high load, if multiple users created tasks in the same project simultaneously, the application would generate duplicate task numbers (e.g., two tasks with `ENG-101`), violating the unique identifier requirement.
@@ -24,3 +24,17 @@ The `create` method in `tasks.service.ts` used `countDocuments({ projectId }) + 
 ## Resolution
 1. **Sequence Collection**: Created a new `ProjectSequence` schema (`sequence.schema.ts`) to track the current task sequence number for each project.
 2. **Atomic Increment**: Updated `tasks.service.ts` to use MongoDB's atomic `findOneAndUpdate` with the `$inc` operator. This guarantees that each task creation request increments the sequence atomically and returns a unique number, permanently resolving the race condition.
+
+---
+
+# 3- Known Issues: Stale Data & Prop Types
+
+## Description
+1. **Stale Data on Organization Mutation**: 
+   - **File**: `apps/web/src/features/organizations/hooks.ts`
+   - **Issue**: After successfully adding a member to an organization (`useAddOrganizationMember`), the app does not invalidate the `currentUser` or any `organization` queries. If a user adds an admin or another member, that change is not immediately reflected across the app unless a hard refresh occurs. 
+   - **Fix Required**: Add `organizationMembers` or `organizations` to `queryKeys` in `apps/web/src/lib/query-keys.ts` and invalidate them in the `onSuccess` callback of the mutation.
+
+2. **Prop Type Error (Fixed)**:
+   - **File**: `apps/web/src/features/organizations/components/add-member-dialog.tsx`
+   - **Issue**: The `Button` component was given a `tone="secondary"` prop, which caused a TypeScript error because it only accepts `variant`. This has been patched in the local file to `variant="secondary"`.
