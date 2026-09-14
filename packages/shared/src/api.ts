@@ -94,6 +94,12 @@ export interface Paginated<T> {
   pageSize: number;
 }
 
+export interface CursorPaginated<T> {
+  items: T[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
 /** Shape produced by the API's exception filter for every non-2xx response. */
 export interface ApiErrorBody {
   statusCode: number;

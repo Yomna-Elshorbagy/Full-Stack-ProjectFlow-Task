@@ -1,7 +1,7 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { type FilterQuery, Model, Types } from 'mongoose';
-import type { Paginated, TaskDetail, TaskSummary } from '@projectflow/shared';
+import type { CursorPaginated, Paginated, TaskDetail, TaskSummary } from '@projectflow/shared';
 import { toUserSummary } from '../common/utils/serialize';
 import { Comment, type CommentDocument } from '../comments/schemas/comment.schema';
 import { canManage, ProjectAccessService } from '../projects/project-access.service';
@@ -12,7 +12,7 @@ import type { ListTasksQueryDto } from './dto/list-tasks.dto';
 import type { UpdateTaskDto } from './dto/update-task.dto';
 import type { UpdateTaskStatusDto } from './dto/update-task-status.dto';
 import type { AssignTaskDto } from './dto/assign-task.dto';
-import type { PaginationQueryDto } from '../common/dto/pagination.dto';
+import type { CursorPaginationQueryDto } from '../common/dto/cursor-pagination.dto';
 import { Activity, type ActivityDocument, ActivityType } from './schemas/activity.schema';
 import { Sequence, type SequenceDocument } from './schemas/sequence.schema';
 import { Task, type TaskDocument } from './schemas/task.schema';
@@ -171,14 +171,31 @@ export class TasksService {
     return this.toDetail(task, access.project);
   }
 
-  async getActivity(taskId: Types.ObjectId, userId: Types.ObjectId, query: PaginationQueryDto): Promise<Paginated<ActivityEntry>> {
+  async getActivity(taskId: Types.ObjectId, userId: Types.ObjectId, query: CursorPaginationQueryDto): Promise<CursorPaginated<ActivityEntry>> {
     const task = await this.findTaskOrFail(taskId);
     await this.projectAccessService.assertCanView(task.projectId, userId);
 
-    const [activities, total] = await Promise.all([
-      this.activityModel.find({ taskId }).sort({ createdAt: -1 }).skip(query.skip).limit(query.pageSize).exec(),
-      this.activityModel.countDocuments({ taskId }),
-    ]);
+    const filter: any = { taskId };
+    if (query.cursor) {
+      filter._id = { $lt: new Types.ObjectId(query.cursor) };
+    }
+
+    const limit = query.limit || 20;
+
+    const activities = await this.activityModel
+      .find(filter)
+      .sort({ _id: -1 })
+      .limit(limit + 1)
+      .exec();
+
+    let hasMore = false;
+    if (activities.length > limit) {
+      hasMore = true;
+      activities.pop();
+    }
+
+    const lastActivity = activities[activities.length - 1];
+    const nextCursor = hasMore && lastActivity ? lastActivity._id.toString() : null;
 
     const actors = await this.usersService.findManyByIds(activities.map(a => a.actorId));
     const actorsById = new Map(actors.map(u => [u._id.toString(), u]));
@@ -194,9 +211,8 @@ export class TasksService {
 
     return {
       items,
-      total,
-      page: query.page,
-      pageSize: query.pageSize,
+      nextCursor,
+      hasMore,
     };
   }
 

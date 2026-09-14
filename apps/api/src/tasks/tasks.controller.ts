@@ -11,7 +11,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import type { Paginated, TaskDetail, TaskSummary } from '@projectflow/shared';
+import type { CursorPaginated, Paginated, TaskDetail, TaskSummary } from '@projectflow/shared';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { toObjectId } from '../common/utils/object-id';
 import { CreateTaskDto } from './dto/create-task.dto';
@@ -19,7 +19,7 @@ import { ListTasksQueryDto } from './dto/list-tasks.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
 import { AssignTaskDto } from './dto/assign-task.dto';
-import { PaginationQueryDto } from '../common/dto/pagination.dto';
+import { CursorPaginationQueryDto } from '../common/dto/cursor-pagination.dto';
 import type { ActivityEntry } from '@projectflow/shared';
 import { TasksService } from './tasks.service';
 
@@ -95,8 +95,8 @@ export class TasksController {
   getActivity(
     @Param('taskId') taskId: string,
     @CurrentUser('id') userId: string,
-    @Query() query: PaginationQueryDto,
-  ): Promise<Paginated<ActivityEntry>> {
+    @Query() query: CursorPaginationQueryDto,
+  ): Promise<CursorPaginated<ActivityEntry>> {
     return this.tasksService.getActivity(toObjectId(taskId, 'task id'), toObjectId(userId, 'user id'), query);
   }
 

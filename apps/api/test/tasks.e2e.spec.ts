@@ -255,7 +255,8 @@ describe('Tasks', () => {
         .set('Authorization', authHeader(owner))
         .expect(200);
 
-      expect(activityRes.body.total).toBe(1);
+      expect(activityRes.body.items.length).toBe(1);
+      expect(activityRes.body.hasMore).toBe(false);
       expect(activityRes.body.items[0]).toMatchObject({
         type: 'TASK_ASSIGNEE_CHANGED',
         metadata: { assigneeId: member.id }
