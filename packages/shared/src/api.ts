@@ -49,6 +49,7 @@ export interface TaskSummary {
   status: TaskStatus;
   priority: TaskPriority;
   commentCount: number;
+  assignee?: UserSummary | null;
   createdBy: UserSummary;
   createdAt: string;
   updatedAt: string;
@@ -66,6 +67,15 @@ export interface CommentEntry {
   author: UserSummary;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ActivityEntry {
+  id: string;
+  taskId: string;
+  actor: UserSummary;
+  type: string;
+  metadata?: Record<string, any>;
+  createdAt: string;
 }
 
 export interface AuthSession {

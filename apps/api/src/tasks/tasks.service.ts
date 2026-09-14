@@ -11,7 +11,12 @@ import type { CreateTaskDto } from './dto/create-task.dto';
 import type { ListTasksQueryDto } from './dto/list-tasks.dto';
 import type { UpdateTaskDto } from './dto/update-task.dto';
 import type { UpdateTaskStatusDto } from './dto/update-task-status.dto';
+import type { AssignTaskDto } from './dto/assign-task.dto';
+import type { PaginationQueryDto } from '../common/dto/pagination.dto';
+import { Activity, type ActivityDocument, ActivityType } from './schemas/activity.schema';
+import { Sequence, type SequenceDocument } from './schemas/sequence.schema';
 import { Task, type TaskDocument } from './schemas/task.schema';
+import type { ActivityEntry } from '@projectflow/shared';
 
 @Injectable()
 export class TasksService {
@@ -19,6 +24,8 @@ export class TasksService {
     @InjectModel(Task.name) private readonly taskModel: Model<TaskDocument>,
     @InjectModel(Project.name) private readonly projectModel: Model<ProjectDocument>,
     @InjectModel(Comment.name) private readonly commentModel: Model<CommentDocument>,
+    @InjectModel(Sequence.name) private readonly sequenceModel: Model<SequenceDocument>,
+    @InjectModel(Activity.name) private readonly activityModel: Model<ActivityDocument>,
     private readonly projectAccessService: ProjectAccessService,
     private readonly usersService: UsersService,
   ) {}
@@ -58,8 +65,12 @@ export class TasksService {
   ): Promise<TaskDetail> {
     const { project } = await this.projectAccessService.assertCanView(projectId, userId);
 
-    const taskCount = await this.taskModel.countDocuments({ projectId });
-    const number = taskCount + 1;
+    const sequenceDoc = await this.sequenceModel.findOneAndUpdate(
+      { projectId },
+      { $inc: { seq: 1 } },
+      { new: true, upsert: true }
+    );
+    const number = sequenceDoc.seq;
 
     const task = await this.taskModel.create({
       projectId,
@@ -113,20 +124,91 @@ export class TasksService {
     return this.toDetail(task, access.project);
   }
 
-  async updateStatus(taskId: Types.ObjectId, dto: UpdateTaskStatusDto): Promise<TaskDetail> {
+  async updateStatus(
+    taskId: Types.ObjectId,
+    userId: Types.ObjectId,
+    dto: UpdateTaskStatusDto,
+  ): Promise<TaskDetail> {
     const task = await this.findTaskOrFail(taskId);
+    const access = await this.projectAccessService.assertCanView(task.projectId, userId);
+
+    const isCreator = task.createdBy.equals(userId);
+    if (!canManage(access) && !isCreator) {
+      throw new ForbiddenException('You do not have permission to edit this task');
+    }
 
     task.status = dto.status;
     await task.save();
 
-    return this.toDetail(task);
+    return this.toDetail(task, access.project);
+  }
+
+  async assign(taskId: Types.ObjectId, userId: Types.ObjectId, dto: AssignTaskDto): Promise<TaskDetail> {
+    const task = await this.findTaskOrFail(taskId);
+    const access = await this.projectAccessService.assertCanView(task.projectId, userId);
+
+    const isCreator = task.createdBy.equals(userId);
+    if (!canManage(access) && !isCreator) {
+      throw new ForbiddenException('You do not have permission to assign this task');
+    }
+
+    if (dto.assigneeId) {
+      await this.projectAccessService.assertCanView(task.projectId, new Types.ObjectId(dto.assigneeId));
+      task.assignee = new Types.ObjectId(dto.assigneeId);
+    } else {
+      task.assignee = null;
+    }
+
+    await task.save();
+
+    await this.activityModel.create({
+      taskId: task._id,
+      actorId: userId,
+      type: ActivityType.TASK_ASSIGNEE_CHANGED,
+      metadata: { assigneeId: dto.assigneeId },
+    });
+
+    return this.toDetail(task, access.project);
+  }
+
+  async getActivity(taskId: Types.ObjectId, userId: Types.ObjectId, query: PaginationQueryDto): Promise<Paginated<ActivityEntry>> {
+    const task = await this.findTaskOrFail(taskId);
+    await this.projectAccessService.assertCanView(task.projectId, userId);
+
+    const [activities, total] = await Promise.all([
+      this.activityModel.find({ taskId }).sort({ createdAt: -1 }).skip(query.skip).limit(query.pageSize).exec(),
+      this.activityModel.countDocuments({ taskId }),
+    ]);
+
+    const actors = await this.usersService.findManyByIds(activities.map(a => a.actorId));
+    const actorsById = new Map(actors.map(u => [u._id.toString(), u]));
+
+    const items = activities.map(a => ({
+      id: a._id.toString(),
+      taskId: a.taskId.toString(),
+      actor: toCreatorSummary(actorsById.get(a.actorId.toString())),
+      type: a.type,
+      metadata: a.metadata,
+      createdAt: a.createdAt.toISOString(),
+    }));
+
+    return {
+      items,
+      total,
+      page: query.page,
+      pageSize: query.pageSize,
+    };
   }
 
   async remove(taskId: Types.ObjectId, userId: Types.ObjectId): Promise<void> {
     const task = await this.findTaskOrFail(taskId);
     await this.projectAccessService.assertCanManage(task.projectId, userId);
 
-    await Promise.all([this.commentModel.deleteMany({ taskId: task._id }), task.deleteOne()]);
+    await Promise.all([
+      this.commentModel.deleteMany({ taskId: task._id }),
+      this.activityModel.deleteMany({ taskId: task._id }),
+      task.deleteOne()
+    ]);
   }
 
   async findTaskOrFail(taskId: Types.ObjectId): Promise<TaskDocument> {
@@ -142,8 +224,14 @@ export class TasksService {
       return [];
     }
 
-    const [creators, commentRows] = await Promise.all([
-      this.usersService.findManyByIds(tasks.map((task) => task.createdBy)),
+    const userIds = new Set<string>();
+    tasks.forEach(task => {
+      userIds.add(task.createdBy.toString());
+      if (task.assignee) userIds.add(task.assignee.toString());
+    });
+
+    const [users, commentRows] = await Promise.all([
+      this.usersService.findManyByIds(Array.from(userIds).map(id => new Types.ObjectId(id))),
       this.commentModel
         .aggregate<{
           _id: Types.ObjectId;
@@ -155,7 +243,7 @@ export class TasksService {
         .exec(),
     ]);
 
-    const creatorsById = new Map(creators.map((user) => [user._id.toString(), user]));
+    const usersById = new Map(users.map((user) => [user._id.toString(), user]));
     const commentCounts = new Map(commentRows.map((row) => [row._id.toString(), row.count]));
 
     return tasks.map((task) => ({
@@ -167,7 +255,8 @@ export class TasksService {
       status: task.status,
       priority: task.priority,
       commentCount: commentCounts.get(task._id.toString()) ?? 0,
-      createdBy: toCreatorSummary(creatorsById.get(task.createdBy.toString())),
+      assignee: task.assignee ? toCreatorSummary(usersById.get(task.assignee.toString())) : null,
+      createdBy: toCreatorSummary(usersById.get(task.createdBy.toString())),
       createdAt: task.createdAt.toISOString(),
       updatedAt: task.updatedAt.toISOString(),
     }));
