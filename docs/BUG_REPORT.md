@@ -25,6 +25,9 @@ The `create` method in `tasks.service.ts` used `countDocuments({ projectId }) + 
 1. **Sequence Collection**: Created a new `ProjectSequence` schema (`sequence.schema.ts`) to track the current task sequence number for each project.
 2. **Atomic Increment**: Updated `tasks.service.ts` to use MongoDB's atomic `findOneAndUpdate` with the `$inc` operator. This guarantees that each task creation request increments the sequence atomically and returns a unique number, permanently resolving the race condition.
 
+## Regression Prevention
+To ensure this issue never returns (e.g. if someone accidentally rewrites the service logic), a strict `{ unique: true }` constraint was added to the `TaskSchema` index for `{ projectId: 1, number: 1 }`. This enforces uniqueness directly at the database layer, so MongoDB will outright reject any duplicate insertions.
+
 ---
 
 # 3- Known Issues: Stale Data & Prop Types

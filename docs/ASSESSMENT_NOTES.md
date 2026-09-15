@@ -33,54 +33,69 @@ Crucially, instead of using arrays of ObjectIds on the parent document (which is
 ### 1. Concurrent Task Creation (Race Condition)
 - **Observation:** In `tasks.service.ts`, the `create` method generates task identifiers using `countDocuments() + 1`. 
 - **Risk:** This approach is fundamentally not thread-safe. If two concurrent requests create a task in the same project, both will read the same count and assign the exact same `number` and `key` (e.g., `ENG-101`), leading to duplicate identifiers.
-- **Action:** I will fix this immediately as requested in the brief. A safe solution involves using atomic database operations, such as a separate `sequences` collection with `findOneAndUpdate` and `$inc`.
+- **Action:**  [FIXED] I will fix this immediately as requested in the brief. A safe solution involves using atomic database operations, such as a separate `sequences` collection with `findOneAndUpdate` and `$inc`.
 
 ### 2. Missing Authorization Check on Task Status Updates (Security)
 - **Observation:** In `tasks.controller.ts`, the `PATCH /tasks/:taskId/status` endpoint does not retrieve the `@CurrentUser()` and passes no user context to `tasks.service.ts`'s `updateStatus` method. The service then updates the status without checking `projectAccessService`.
 - **Risk:** This is a severe security vulnerability (Insecure Direct Object Reference / IDOR). Any authenticated user can modify the status of *any* task in the database, even if they aren't a member of the organization or project, simply by knowing the task's ID. This directly aligns with the reported production bug.
-- **Action:** I will fix this immediately by enforcing the same `assertCanView` (and edit permission logic) used in the standard `update` method.
+- **Action:**  [FIXED] I will fix this immediately by enforcing the same `assertCanView` (and edit permission logic) used in the standard `update` method.
 
 ### 3. Non-Transactional Multi-Document Updates (Data Consistency)
 - **Observation:** When deleting a task (`tasks.service.ts -> remove`), the code runs `Promise.all([this.commentModel.deleteMany(...), task.deleteOne()])`. 
 - **Risk:** Because these are separate database operations executed without a MongoDB transaction, if one operation fails (e.g., due to a network blip), the database could be left in an inconsistent state (e.g., orphaned comments for a deleted task, or a task that couldn't be deleted despite its comments being wiped).
-- **Action:** I will note this as a future improvement. While not catastrophic for a lightweight system, introducing MongoDB Sessions and Transactions for multi-document operations would greatly improve data consistency as the application scales.
+- **Action:** [NOT FIXED] I noted this as a future improvement. While not catastrophic for a lightweight system, introducing MongoDB Sessions and Transactions for multi-document operations would greatly improve data consistency as the application scales.
+- **Missing UI Note:** Furthermore, while the backend API endpoint exists for task deletion, the frontend is completely missing the UI (e.g., a "Delete Task" button) to actually trigger it. This leaves users unable to clean up their task boards.
 
 ### 4. JWT Stored in LocalStorage (Security)
 - **Observation:** In `apps/web/src/lib/auth-storage.ts`, the application stores the JWT bearer token directly in `window.localStorage`.
 - **Risk:** Storing authentication tokens in localStorage makes the application highly vulnerable to Cross-Site Scripting (XSS) attacks. If any malicious JavaScript is executed on the page, it can read `localStorage` and steal the user's active token.
-- **Action:** A more secure architecture would rely on an `httpOnly`, `Secure` cookie set by the backend, which is invisible to frontend JavaScript.
+- **Action:** [NOT FIXED] A more secure architecture would rely on an `httpOnly`, `Secure` cookie set by the backend, which is invisible to frontend JavaScript.
 
 ### 5. Lack of Optimistic Updates for Task Mutations (UX / Performance)
 - **Observation:** In `apps/web/src/features/tasks/hooks.ts`, the `useUpdateTaskStatus` hook relies on the `onSuccess` callback to invalidate the query and refresh the UI.
 - **Risk:** While functionally correct, this degrades the user experience for a project management tool. Changing a task status requires waiting for the network round-trip before the UI reflects the change, making the application feel sluggish or unresponsive. 
-- **Action:** I will implement optimistic updates for the new Task Assignment feature, where the UI updates immediately and rolls back if the server request fails.
+- **Action:** [FIXED] I implemented optimistic updates for the new Task Assignment feature, where the UI updates immediately and rolls back if the server request fails.
 
 ### 6. Pagination & Data Growth for Activity System (Scaling)
 - **Observation:** Activity logs (like task assignment changes) will grow linearly and much faster than the tasks themselves. 
 - **Risk:** Standard offset pagination (`skip` and `limit`) becomes extremely slow on large collections because the database must scan and skip all previous documents before returning the requested page.
-- **Action:** I will ensure the new Activity API design takes this into account. For true scale, a cursor-based pagination strategy paired with robust indexing would be necessary.
+- **Action:** [FIXED] i will ensure the new Activity API design takes this into account. For true scale, a cursor-based pagination strategy paired with robust indexing would be necessary.
 ### 7. Missing Registration UI (UX / Completeness)
 - **Observation:** The backend API has a fully functional `POST /auth/register` endpoint, but the frontend (`apps/web/src/app`) only contains a `/login` page and lacks a corresponding Registration UI. 
 - **Risk:** New users cannot naturally onboard into the platform without manual API intervention or database seeding, severely limiting the product's usability. Furthermore, newly registered users start with no default organization or project roles, meaning a complete onboarding flow (Create User → Create/Join Organization) must be designed.
 - **Action:** For the scope of this assessment, this is noted as an intentional omission. In a production environment, building out the `RegisterForm` component and the "Create Organization" onboarding flow would be an immediate priority.
+ [FIXED] I implemented the `RegisterForm` component and the complete onboarding flow.
+
 ### 8. Missing API Documentation (Developer Experience)
 - **Observation:** There is no Swagger (OpenAPI) configuration or Postman collection provided for the NestJS backend. 
 - **Risk:** In an API-first architecture, lacking interactive documentation severely degrades the developer experience. It makes it difficult for frontend engineers or third-party integrators to know what endpoints exist, what DTO payloads are required, and what responses to expect without manually reading the backend source code.
 - **Action:** A standard improvement would be to install `@nestjs/swagger`, decorate the controllers and DTOs, and expose a `/api/docs` endpoint to auto-generate interactive API documentation.
+ [FIXED] I installed `@nestjs/swagger`, decorated the controllers and DTOs, and exposed a `http://localhost:4732/projectflow/api/docs` endpoint to auto-generate interactive API documentation.
+ 
 ### 9. Missing Caching Layer (Scaling)
 - **Observation:** All read requests (like fetching the project details or task lists) currently hit the MongoDB database directly.
 - **Risk:** While this is perfectly fine for 5,000 users, as the application scales towards 500,000 users, the database will bottleneck on heavily accessed endpoints, causing slow response times and high infrastructure costs.
-- **Action:** A standard scaling improvement would be to introduce an in-memory cache like **Redis**. The best practice is to only cache data with a high read-to-write ratio (e.g., the first page of the Activity History or the Project Details). Crucially, an event-driven invalidation strategy must be implemented to delete the cache key whenever the underlying data is mutated (e.g., when a task is updated).
+- **Action:** [NOT FIXED] A standard scaling improvement would be to introduce an in-memory cache like **Redis**. The best practice is to only cache data with a high read-to-write ratio (e.g., the first page of the Activity History or the Project Details). Crucially, an event-driven invalidation strategy must be implemented to delete the cache key whenever the underlying data is mutated (e.g., when a task is updated).
 
 ### 10. Missing Organization Member Management (UX / Completeness)
 - **Observation:** The platform currently supports organizations, but there is no mechanism for an admin or owner to invite or add a new user to their organization. Both the API endpoint and the frontend UI for this are completely missing.
 - **Risk:** Without the ability to add members to an organization, the core collaborative aspect of the platform is broken. Users are isolated and cannot work together across projects.
-- **Action:** I will implement a new `POST /organizations/:id/members` endpoint on the backend to handle role assignments, and build an `AddMemberDialog` component in the frontend UI to allow elevated users to add new members.
+- **Action:** [FIXED] I implemented a new `POST /organizations/:id/members` endpoint on the backend to handle role assignments, and built an `AddMemberDialog` component in the frontend UI to allow elevated users to add new members.
 
 ### 11. Missing Create Project UI (UX / Completeness)
 - **Observation:** The backend API has a fully functional `POST /projects` endpoint (and it successfully connects to `ProjectsService.create`), but the frontend is completely missing the UI to trigger this.
 - **Risk:** Without a UI to create projects, users cannot initiate new workstreams without manual database seeding, breaking a core loop of the application.
-- **Action:** I will build a `CreateProjectDialog` component for the frontend and integrate it into the `ProjectsView` page header, restricting it to users with an elevated organization role (`OWNER` or `ADMIN`).
+- **Action:** [FIXED] I built a `CreateProjectDialog` component for the frontend and integrated it into the `ProjectsView` page header.
+
+### 12. Missing "Add Projects" Button Trigger (UX / Completeness)
+- **Observation:** Even with the Project UI creation endpoint existing, the application lacked a clear, accessible entry point (like an "Add Project" button) in the dashboard views for users to intuitively trigger the creation flow.
+- **Risk:** If the entry point to create a project is buried or missing, the UX is degraded because users do not know how to start new workflows.
+- **Action:** [FIXED] I implemented and wired up the explicit Add Projects button to ensure a smooth, intuitive user journey when creating new projects within an organization.
+
+### 13. Missing Project Deletion API (Data Management / Business Logic)
+- **Observation:** There is no `DELETE /projects/:id` API endpoint, nor any UI to delete or archive a project. Consequently, there is no cascading logic applied to clean up associated tasks or comments when a project is no longer needed.
+- **Risk:** As organizations use the tool over time, they will accumulate stale or completed projects. Without a deletion mechanism, the UI will become cluttered with dead projects, degrading the user experience.
+- **Action:** [NOT FIXED] According to standard business logic, a deletion or archival feature *is* necessary. If implemented, it must be strictly protected via `ProjectAccessService` so that only an Organization `OWNER`/`ADMIN` or a Project `PROJECT_MANAGER` can trigger it. Furthermore, the backend must implement a transactional cascading delete to ensure all related Tasks, Comments, and Activity logs are wiped (or soft-deleted) simultaneously to prevent orphaned database records. I documented this as a necessary future story.
 
 ## Structure & Layer Responsibility
 
@@ -143,5 +158,49 @@ projectflow/
 | `/tasks/:taskId` | `GET`, `PATCH`, `DELETE` | `TasksService` | Fetches, updates, or deletes a task |
 | `/tasks/:taskId/status` | `PATCH` | `TasksService` | Updates task status *(currently missing auth!)* |
 | `/tasks/:taskId/comments` | `GET`, `POST` | `CommentsService` | Lists or adds task comments |
+
+---
+
+## Code Review
+
+The following is a review of a hypothetical PR submission for task assignment:
+
+```typescript
+async assignTask(taskId: string, assigneeId: string, userId: string) {
+  const task = await this.taskModel.findById(taskId);
+  if (!task) { throw new NotFoundException(); }
+  const user = await this.userModel.findById(assigneeId);
+  if (!user) { throw new NotFoundException(); }
+  task.assignee = user._id;
+  await task.save();
+  return task;
+}
+```
+
+### Review Comments
+
+**1. Security & Authorization (Critical / IDOR)**
+The most glaring issue is that `userId` is passed into the function but completely ignored. There is no **authorization** check. Any authenticated user can change the assignee of *any* task in *any* project simply by supplying valid IDs. 
+* **Requested Change:** You must use `projectAccessService.assertCanView` (or a similar guard) to verify the `userId` has access to the task's project, and enforce that they have the right permissions (`canManage`, task creator, or self-assigning).
+
+**2. Correctness & Business Rules**
+The code verifies that the `user` exists in the global database, but it does not verify that the user is actually a member of the project. This violates core **business rules**.
+* **Requested Change:** Assert that the `assigneeId` actually has access to `task.projectId` before assigning them. Assigning an outsider breaks the application's correctness.
+
+**3. Data Consistency**
+The product requirements state that any change to a task's assignee must generate an activity record. By omitting this, the database loses **data consistency** between the task state and the activity timeline.
+* **Requested Change:** You need to capture the previous assignee before modifying it, and then create an `ActivityType.TASK_ASSIGNEE_CHANGED` document in the same flow.
+
+**4. Performance**
+The `await this.userModel.findById(assigneeId)` call is an unnecessary database hit. If you properly check project membership via the `projectAccessService`, it will already validate that the user exists.
+* **Requested Change:** Remove the redundant `findById` call to improve **performance**, and rely on the shared authorization service to validate the user.
+
+**5. Architecture & Maintainability**
+Returning `task` directly leaks the raw Mongoose document. This exposes internal fields (`__v`) and breaks our strict Type boundary (`TaskDetail`), negatively impacting the architecture and **maintainability** of the API.
+* **Requested Change:** Serialize the raw document using `this.toDetail(task)` before returning it so the controller sends a clean, validated DTO.
+
+**6. Error Handling**
+Throwing an empty `new NotFoundException()` provides poor developer experience.
+* **Requested Change:** Improve **error handling** by adding specific messages (e.g., `'Task not found'`) so frontend engineers can accurately debug failing requests.
 
 ---
