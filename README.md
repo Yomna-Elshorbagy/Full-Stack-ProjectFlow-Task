@@ -163,6 +163,39 @@ These are local development accounts only.
 
 ---
 
+## Technical Decisions
+
+During the development and stabilization of this project, several major architectural decisions were made:
+
+1. **Atomic Sequences for Task Concurrency:** To prevent race conditions when multiple users create tasks simultaneously, task numbers are generated using a dedicated `project_sequences` collection with atomic `findOneAndUpdate` operations and a `{ unique: true }` compound index.
+2. **Backend-For-Frontend (BFF) Hydration:** The Activity timeline hydrates user metadata (like assignee names) directly in the backend using batched queries (`$in`) instead of leaving the frontend to perform N+1 API calls.
+3. **Cursor Pagination:** Standard offset pagination degrades quickly on large time-series datasets. The Activity timeline uses high-performance Cursor Pagination based on the MongoDB `_id` chronological sorting.
+4. **Centralized Authorization Guarding:** To prevent Insecure Direct Object Reference (IDOR) vulnerabilities, all data access and mutation endpoints strictly pipe through `ProjectAccessService.assertCanView` or `assertCanManage`.
+
+---
+
+## Known Limitations
+
+To adhere to the scope of the assessment, some features were intentionally left out as future improvements:
+
+1. **JWT Storage:** JWT tokens are currently stored in `localStorage`. For production security against XSS attacks, this must be migrated to `HttpOnly` secure cookies.
+2. **Caching & Message Queues:** As read/write volumes scale, the application will need a Redis caching layer for read-heavy routes and a background job queue (e.g., BullMQ) to process activity logs asynchronously.
+3. **Cascading Deletions:** Deleting a task currently executes multiple independent operations via `Promise.all` rather than a MongoDB transactional session, risking orphaned records on failure. Furthermore, there is no API or UI to delete entire Projects.
+
+---
+
+## Documentation
+
+The `docs/` folder contains deeper dives into specific areas of the project:
+
+- **[AI_LOG.md](./docs/AI_LOG.md)** — A log of AI-assisted tasks and prompts used during development.
+- **[ASSESSMENT_NOTES.md](./docs/ASSESSMENT_NOTES.md)** — Extensive notes on the original assessment requirements, planning, and implementation steps, code review exercise.
+- **[BUG_REPORT.md](./docs/BUG_REPORT.md)** — Documentation of identified issues, debugging steps.
+- **[DOCKER_ARCHITECTURE.md](./docs/DOCKER_ARCHITECTURE.md)** — In-depth explanation of the containerized setup, multi-stage builds, and deployment.
+- **[SCALING_ACTIVITY_SYSTEM.md](./docs/SCALING_ACTIVITY_SYSTEM.md)** — Technical deep dive into the design decisions for building a high-performance Activity Timeline.
+
+---
+
 ## Architecture
 
 ```

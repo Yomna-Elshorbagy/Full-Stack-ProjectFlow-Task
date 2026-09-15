@@ -203,4 +203,28 @@ Returning `task` directly leaks the raw Mongoose document. This exposes internal
 Throwing an empty `new NotFoundException()` provides poor developer experience.
 * **Requested Change:** Improve **error handling** by adding specific messages (e.g., `'Task not found'`) so frontend engineers can accurately debug failing requests.
 
+## If I Had Two More Days
+
+After conducting a deep-dive review of the codebase (specifically analyzing the frontend `package.json`, `auth-storage.ts`, and the NestJS services like `tasks.service.ts`), and accounting for the features already implemented (like the registration flow, activity timelines, optimistic UI, and critical IDOR/concurrency fixes), here is how I would prioritize the next two days of work to make this platform truly production-ready:
+
+### 1. Security First: Migrate JWT from LocalStorage to HttpOnly Cookies
+* **Code Observation:** Verified in `apps/web/src/lib/auth-storage.ts` that the JWT is explicitly stored using `window.localStorage.setItem()`, and `apps/api/src/auth/auth.controller.ts` returns it in the JSON body.
+* **Action:** This leaves the application exposed to Cross-Site Scripting (XSS) attacks. Fixing this is the absolute highest priority. I would refactor the authentication flow to have the backend set an `httpOnly`, `Secure`, `SameSite=Strict` cookie on login, fundamentally hardening the application's security posture.
+
+### 2. Data Integrity: MongoDB Transactions & Cascading Deletions
+* **Code Observation:** Verified in `apps/api/src/tasks/tasks.service.ts` that the `remove` method uses a non-transactional `Promise.all` for task deletion. Additionally, as noted in observation #13, there is absolutely no `DELETE /projects/:id` API or frontend UI to delete/archive projects.
+* **Action:** I will handle the missing delete project API by introducing a strict, role-protected (OWNER/ADMIN only) project deletion endpoint. I would introduce MongoDB Sessions to wrap these multi-document operations in transactions, ensuring atomicity. This guarantees that when a project is deleted, all associated tasks, comments, and activities are transactionally wiped via a cascading delete, preventing orphaned records.
+
+### 3. User Experience: Real-Time Collaboration via WebSockets
+* **Code Observation:** The application relies entirely on standard REST and TanStack Query mutations/invalidations, lacking any event-driven push mechanism.
+* **Action:** A core expectation of modern project management tools is instant updates. I would integrate `Socket.io` (or a similar WebSocket solution) to push real-time updates to the frontend for collaborative actions like assignee changes and new comments.
+
+### 4. Scaling: will try Implement Redis Caching Layer
+* **Code Observation:** Every `GET` request in the services (like fetching project details or activity timelines) queries MongoDB directly without an in-memory cache.
+* **Action:** To support scaling to hundreds of thousands of users, hitting MongoDB for every read query is unsustainable. I would introduce Redis to cache high-traffic, read-heavy endpoints, paired with a robust event-driven cache invalidation strategy.
+
+### 5. Reliability: will try Automated CI/CD & Frontend E2E Testing
+* **Code Observation:** Verified in `apps/web/package.json` that there are zero testing libraries installed (no Playwright, Cypress, or Jest).
+* **Action:** While the backend has e2e tests, the frontend relies entirely on manual testing. I would set up a CI/CD pipeline (e.g., GitHub Actions) and introduce Playwright to automate critical user journeys (like logging in, creating a project, and assigning a task) to guarantee regression-free deployments.
+
 ---
