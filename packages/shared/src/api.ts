@@ -69,12 +69,17 @@ export interface CommentEntry {
   updatedAt: string;
 }
 
+export interface TaskAssigneeChangedMetadata {
+  from?: UserSummary | null;
+  to?: UserSummary | null;
+}
+
 export interface ActivityEntry {
   id: string;
   taskId: string;
   actor: UserSummary;
   type: string;
-  metadata?: Record<string, any>;
+  metadata?: TaskAssigneeChangedMetadata | Record<string, any>;
   createdAt: string;
 }
 

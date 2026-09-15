@@ -152,6 +152,8 @@ export class TasksService {
       throw new ForbiddenException('You do not have permission to assign this task');
     }
 
+    const previousAssigneeId = task.assignee ? task.assignee.toString() : null;
+
     if (dto.assigneeId) {
       await this.projectAccessService.assertCanView(task.projectId, new Types.ObjectId(dto.assigneeId));
       task.assignee = new Types.ObjectId(dto.assigneeId);
@@ -165,7 +167,7 @@ export class TasksService {
       taskId: task._id,
       actorId: userId,
       type: ActivityType.TASK_ASSIGNEE_CHANGED,
-      metadata: { assigneeId: dto.assigneeId },
+      metadata: { from: previousAssigneeId, to: dto.assigneeId || null },
     });
 
     return this.toDetail(task, access.project);
@@ -197,17 +199,32 @@ export class TasksService {
     const lastActivity = activities[activities.length - 1];
     const nextCursor = hasMore && lastActivity ? lastActivity._id.toString() : null;
 
-    const actors = await this.usersService.findManyByIds(activities.map(a => a.actorId));
+    const userIdsToFetch = new Set<string>();
+    activities.forEach(a => {
+      userIdsToFetch.add(a.actorId.toString());
+      if (a.metadata?.from) userIdsToFetch.add(a.metadata.from);
+      if (a.metadata?.to) userIdsToFetch.add(a.metadata.to);
+    });
+
+    const actors = await this.usersService.findManyByIds(
+      Array.from(userIdsToFetch).map(id => new Types.ObjectId(id))
+    );
     const actorsById = new Map(actors.map(u => [u._id.toString(), u]));
 
-    const items = activities.map(a => ({
-      id: a._id.toString(),
-      taskId: a.taskId.toString(),
-      actor: toCreatorSummary(actorsById.get(a.actorId.toString())),
-      type: a.type,
-      metadata: a.metadata,
-      createdAt: a.createdAt.toISOString(),
-    }));
+    const items = activities.map(a => {
+      const metadata: any = { ...a.metadata };
+      if (metadata.from) metadata.from = toCreatorSummary(actorsById.get(metadata.from));
+      if (metadata.to) metadata.to = toCreatorSummary(actorsById.get(metadata.to));
+
+      return {
+        id: a._id.toString(),
+        taskId: a.taskId.toString(),
+        actor: toCreatorSummary(actorsById.get(a.actorId.toString())),
+        type: a.type,
+        metadata,
+        createdAt: a.createdAt.toISOString(),
+      };
+    });
 
     return {
       items,

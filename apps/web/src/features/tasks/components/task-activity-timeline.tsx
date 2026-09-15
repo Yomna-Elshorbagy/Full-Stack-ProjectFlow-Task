@@ -1,7 +1,6 @@
 'use client';
 
 import { useTaskActivities } from '../hooks';
-import { useProjectMembers } from '@/features/projects/hooks';
 import { Avatar } from '@/components/ui/avatar';
 import { formatDateTime } from '@/lib/format';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -13,7 +12,6 @@ interface TaskActivityTimelineProps {
 
 export function TaskActivityTimeline({ taskId, projectId }: TaskActivityTimelineProps) {
   const { data, isPending, isError, hasNextPage, fetchNextPage, isFetchingNextPage } = useTaskActivities(taskId);
-  const { data: members = [] } = useProjectMembers(projectId);
 
   if (isPending) {
     return (
@@ -53,14 +51,24 @@ export function TaskActivityTimeline({ taskId, projectId }: TaskActivityTimeline
             let actionHighlight = null;
             
             if (activity.type === 'TASK_ASSIGNEE_CHANGED') {
-              const assigneeId = activity.metadata?.assigneeId;
-              if (assigneeId) {
-                const assignedMember = members.find(m => m.user.id === assigneeId);
-                const assignedName = assignedMember ? assignedMember.user.name : 'a user';
-                actionText = `assigned to`;
+              const toUser = activity.metadata?.to;
+              const fromUser = activity.metadata?.from;
+              
+              if (toUser) {
+                const assignedName = toUser.name;
+                
+                if (fromUser) {
+                  actionText = `reassigned from ${fromUser.name} to`;
+                } else {
+                  actionText = `assigned to`;
+                }
                 actionHighlight = assignedName;
               } else {
-                actionText = 'removed the assignee';
+                if (fromUser) {
+                  actionText = `unassigned from ${fromUser.name}`;
+                } else {
+                  actionText = 'removed the assignee';
+                }
               }
             }
 
