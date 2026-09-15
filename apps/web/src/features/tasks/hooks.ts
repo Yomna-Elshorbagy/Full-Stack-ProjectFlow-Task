@@ -11,6 +11,7 @@ import {
   fetchTaskActivities,
   updateTaskAssignee,
   updateTaskStatus,
+  deleteTask,
 } from './api';
 
 export function useProjectTasks(projectId: string) {
@@ -97,5 +98,19 @@ export function useTaskActivities(taskId: string) {
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     enabled: taskId.length > 0,
+  });
+}
+
+export function useDeleteTask(projectId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, Error, string>({
+    mutationFn: (taskId) => deleteTask(taskId),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.projectTasks(projectId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.projects }),
+      ]);
+    },
   });
 }

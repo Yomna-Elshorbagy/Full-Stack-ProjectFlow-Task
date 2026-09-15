@@ -11,6 +11,7 @@ import { TaskPriorityBadge } from './task-priority-badge';
 import { TaskStatusSelect } from './task-status-select';
 import { TaskAssigneeSelect } from './task-assignee-select';
 import { TaskActivityTimeline } from './task-activity-timeline';
+import { DeleteTaskButton } from './delete-task-button';
 
 interface TaskViewProps {
   projectId: string;
@@ -112,6 +113,13 @@ export function TaskView({ projectId, taskId }: TaskViewProps) {
               Created
             </h2>
             <p className="text-[13px] text-muted-foreground">{formatDate(task.createdAt)}</p>
+          </div>
+
+          <div className="space-y-1.5 pt-4">
+            <h2 className="text-[11px] font-medium uppercase tracking-wide text-danger">
+              Danger Zone
+            </h2>
+            <DeleteTaskButton taskId={taskId} projectId={projectId} />
           </div>
         </aside>
       </div>

@@ -58,6 +58,12 @@ export function updateTaskAssignee(taskId: string, assigneeId: string | null): P
   });
 }
 
+export function deleteTask(taskId: string): Promise<void> {
+  return apiRequest<void>(`/tasks/${taskId}`, {
+    method: 'DELETE',
+  });
+}
+
 import type { ActivityEntry, CursorPaginated } from '@projectflow/shared';
 
 export function fetchTaskActivities(taskId: string, cursor?: string): Promise<CursorPaginated<ActivityEntry>> {
