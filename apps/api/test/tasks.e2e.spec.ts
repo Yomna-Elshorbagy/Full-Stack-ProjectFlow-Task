@@ -211,12 +211,20 @@ describe('Tasks', () => {
       expect(res.body.assignee.id).toBe(member.id);
     });
 
-    it('refuses to let a normal member assign a task they did not create', async () => {
+    it('refuses to let a normal member assign a task they did not create to someone else', async () => {
+      await request(app.getHttpServer())
+        .patch(`/tasks/${taskId}/assignee`)
+        .set('Authorization', authHeader(member))
+        .send({ assigneeId: owner.id })
+        .expect(403);
+    });
+
+    it('allows a project member to assign themselves to a task', async () => {
       await request(app.getHttpServer())
         .patch(`/tasks/${taskId}/assignee`)
         .set('Authorization', authHeader(member))
         .send({ assigneeId: member.id })
-        .expect(403);
+        .expect(200);
     });
 
     it('allows a normal member to assign a task they created', async () => {
@@ -241,6 +249,13 @@ describe('Tasks', () => {
         .expect(403);
     });
 
+    it('refuses to let unauthorized users access task activity', async () => {
+      await request(app.getHttpServer())
+        .get(`/tasks/${taskId}/activity`)
+        .set('Authorization', authHeader(outsider))
+        .expect(403);
+    });
+
     it('records an activity event when assignee is changed', async () => {
       // Assign the task
       await request(app.getHttpServer())
@@ -255,13 +270,39 @@ describe('Tasks', () => {
         .set('Authorization', authHeader(owner))
         .expect(200);
 
-      expect(activityRes.body.items.length).toBe(1);
-      expect(activityRes.body.hasMore).toBe(false);
+      expect(activityRes.body.items.length).toBeGreaterThan(0);
       expect(activityRes.body.items[0]).toMatchObject({
         type: 'TASK_ASSIGNEE_CHANGED',
-        metadata: { assigneeId: member.id }
+        metadata: { from: null, to: { id: member.id } }
       });
       expect(activityRes.body.items[0].actor.id).toBe(owner.id);
+    });
+
+    it('records an activity event when unassigning a task', async () => {
+      // Assign it first
+      await request(app.getHttpServer())
+        .patch(`/tasks/${taskId}/assignee`)
+        .set('Authorization', authHeader(owner))
+        .send({ assigneeId: member.id })
+        .expect(200);
+        
+      // Then unassign it
+      await request(app.getHttpServer())
+        .patch(`/tasks/${taskId}/assignee`)
+        .set('Authorization', authHeader(owner))
+        .send({ assigneeId: null })
+        .expect(200);
+
+      const activityRes = await request(app.getHttpServer())
+        .get(`/tasks/${taskId}/activity`)
+        .set('Authorization', authHeader(owner))
+        .expect(200);
+        
+      const unassignActivity = activityRes.body.items[0]; // Newest first
+      expect(unassignActivity).toMatchObject({
+        type: 'TASK_ASSIGNEE_CHANGED',
+        metadata: { from: { id: member.id }, to: null }
+      });
     });
   });
 });

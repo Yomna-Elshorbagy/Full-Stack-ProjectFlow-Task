@@ -58,17 +58,17 @@ export function TaskActivityTimeline({ taskId, projectId }: TaskActivityTimeline
                 const assignedName = toUser.name;
                 
                 if (fromUser) {
-                  actionText = `reassigned from ${fromUser.name} to`;
+                  if (fromUser.id === activity.actor.id) {
+                    actionText = `changed the assignee from themselves to`;
+                  } else {
+                    actionText = `changed the assignee from ${fromUser.name} to`;
+                  }
                 } else {
-                  actionText = `assigned to`;
+                  actionText = `assigned`;
                 }
                 actionHighlight = assignedName;
               } else {
-                if (fromUser) {
-                  actionText = `unassigned from ${fromUser.name}`;
-                } else {
-                  actionText = 'removed the assignee';
-                }
+                actionText = 'removed the assignee';
               }
             }
 

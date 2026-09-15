@@ -148,7 +148,9 @@ export class TasksService {
     const access = await this.projectAccessService.assertCanView(task.projectId, userId);
 
     const isCreator = task.createdBy.equals(userId);
-    if (!canManage(access) && !isCreator) {
+    const isAssigningSelf = dto.assigneeId === userId.toString();
+    
+    if (!canManage(access) && !isCreator && !isAssigningSelf) {
       throw new ForbiddenException('You do not have permission to assign this task');
     }
 
